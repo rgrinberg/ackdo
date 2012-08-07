@@ -1,0 +1,13 @@
+OASISFormat: 0.3
+Name:        ackdo
+Version:     0.0.1
+Synopsis:    make changes from modified ack output
+Authors:     Rudi Grinberg
+License:     LGPL-2.1 with OCaml linking exception
+
+Executable ackdo
+  Path:       ./
+  BuildTools: ocamlbuild
+  BuildDepends: batteries
+  MainIs:     main.ml
+  
