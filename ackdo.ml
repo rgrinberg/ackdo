@@ -198,20 +198,35 @@ end
 module CmdArgs = struct
   let usage = "usage: " ^ Sys.argv.(0) ^ " [-d] [-f file] [-c directory]"
   let read_args () = 
+    let input_file = ref None in
     let action = ref Preview in
     let input = ref (IO.lines_of stdin) in
     let cwd = ref (Unix.getcwd ()) in
+    let forced_cwd = ref false in
     let speclist = [
       ("-d", Arg.Unit ( fun () -> action := Commit ), ": -d to commit. nothing to
       preview" );
-      ("-f", Arg.String ( fun s -> input := (BatFile.lines_of s) ), ": -f read
+
+      ("-f", Arg.String ( fun s -> 
+        if not (Sys.file_exists s) then
+          raise (Arg.Bad ("File doesn't exist:" ^ s))
+        else begin
+          input := (BatFile.lines_of s);
+          input_file :=  Some(s);
+        end
+        ), ": -f read
       input from some file instead of stdin");
-      ("-c", Arg.String (fun d -> cwd := d ), ": force cwd to be argument" )
+
+      ("-c", Arg.String (fun d -> cwd := d; forced_cwd := true ),
+       ": force cwd to be argument" )
      ] in
     Arg.parse 
       speclist 
       (fun x -> raise (Arg.Bad ("Bad argument : " ^ x)))
       usage;
+    (match (!input_file) with
+    | Some f when (not (!forced_cwd)) -> cwd := Filename.dirname f
+    | Some _ | None -> ());
     let open InputDetector in
     let module IP = (val (detect_input !input) : Read) in
     { action=(!action) ; input_parser=(module IP : Read); input=(!input) ;
