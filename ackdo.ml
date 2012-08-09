@@ -1,4 +1,7 @@
 open Batteries
+
+let () = Printexc.record_backtrace true
+
 type change_list =
   { file : string;
     changes : change Enum.t }
@@ -88,7 +91,7 @@ end
 module StrMisc = struct
   let create_matcher re = 
     let r = Str.regexp re in
-    (fun x -> Str.string_match r x 0)
+    ( fun x -> Str.string_match r x 0 )
   let blank_str = create_matcher "^ *$"
   let grouped_match = create_matcher "^[1-9][0-9]*:.+$" 
   let ungrouped_detect = create_matcher "^.+:[0-9]+:.+$" 
@@ -98,12 +101,12 @@ end
 module Grouped : Read = struct 
   let split_f f l =
     let unmerged = l |> Enum.group_by (fun a b -> (f a) = (f b))
-     in Enum.from (fun () ->
-       match (Enum.get unmerged, Enum.get unmerged) with
-       | Some(x),Some(y) -> (Enum.get_exn x, y)
-       | None, None -> raise BatEnum.No_more_elements
-       | Some(_), None -> failwith "Odd number of elements. This is bullshit."
-       | None, Some(_) -> failwith "broke the matrix")
+    in Enum.from (fun () ->
+      match (Enum.get unmerged, Enum.get unmerged) with
+      | Some(x),Some(y) -> (Enum.get_exn x, y)
+      | None, None -> raise BatEnum.No_more_elements;
+      | Some(_), None -> failwith "Odd number of elements. This is bullshit."
+      | None, Some(_) -> failwith "broke the matrix")
 
   let parse_change = 
     let re = Str.regexp "^\([0-9]+\):\(.+\)$" in
@@ -145,7 +148,12 @@ end
 
 module InputDetector = struct
   type input_match = Full | File | Line | Unknown
-  exception Failed_to_detect
+  let string_of_match = function
+    | File -> "file"
+    | Full -> "full"
+    | Line -> "line"
+    | Unknown -> "unknown"
+  exception Failed_to_detect of string
   let line_marker line =
     let open StrMisc in
     if ungrouped_detect line then Full
@@ -155,12 +163,22 @@ module InputDetector = struct
 
   let detect_input input =
     (*we don't to want to "mutate" input*)
-    let e = input |> Enum.clone |> Enum.filter StrMisc.blank_str
-                  |> Enum.take 10 |> Enum.map line_marker in
-    if e |> Enum.for_all ( fun x -> x = Full ) then (module Ungrouped : Read)
-    else if ((e |> Enum.get_exn) = File) && (( e |> Enum.get_exn) = Line)
-    then (module Grouped : Read)
-    else raise Failed_to_detect
+    let e = input |> Enum.clone |> Enum.filter (not -| StrMisc.blank_str)
+                  |> Enum.take 10 |> Enum.map line_marker |> List.of_enum in
+    (*let e = input |> Enum.clone |> Enum.filter (not -| StrMisc.blank_str)*)
+                  (*|> Enum.take 10 |> List.of_enum in*)
+    (*print_endline "printing list:::";*)
+    (*e |> List.iter print_endline;*)
+    (*let e = e |> List.map line_marker in*)
+    if e |> List.for_all ( fun x -> x = Full ) 
+    then (module Ungrouped : Read)
+    else match e with
+      | File::Line::xs -> (module Grouped : Read)
+      | [] -> raise (Failed_to_detect "Received empty list, what gives?")
+      | _ ->
+          (*Printf.printf "len is: %d\n" (List.length e);*)
+          (*e |> List.iter ( fun x -> print_endline (string_of_match x) );*)
+          raise (Failed_to_detect "Bad input")
 end
 
 module Operations = struct
@@ -179,7 +197,8 @@ module Operations = struct
       let module IP = (val input_parser : Read) in
       IP.parse_changes ~lines ~cwd in
     try
-      change_lists |> Enum.clone |> Enum.map ( fun { file; _ } -> file ) |> verify_paths;
+      change_lists |> Enum.clone 
+      |> Enum.map ( fun { file; _ } -> file ) |> verify_paths;
       let changes = change_lists |> Enum.map Commit.file_of_changes in
       match action with
       | Preview -> changes |> Enum.iter ( fun ({path=file;_}, preview_list) ->
@@ -204,8 +223,8 @@ module CmdArgs = struct
     let cwd = ref (Unix.getcwd ()) in
     let forced_cwd = ref false in
     let speclist = [
-      ("-d", Arg.Unit ( fun () -> action := Commit ), ": -d to commit. nothing to
-      preview" );
+      ("-d", Arg.Unit ( fun () -> action := Commit ), ": -d to commit. nothing
+      to preview" );
 
       ("-f", Arg.String ( fun s -> 
         if not (Sys.file_exists s) then
@@ -224,6 +243,10 @@ module CmdArgs = struct
       speclist 
       (fun x -> raise (Arg.Bad ("Bad argument : " ^ x)))
       usage;
+    (*
+     *we set the current directory to the parent of the input file's path in the
+     *case when user specified an input file but did not set an explicit cwd
+     *)
     (match (!input_file) with
     | Some f when (not (!forced_cwd)) -> cwd := Filename.dirname f
     | Some _ | None -> ());

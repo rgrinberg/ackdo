@@ -7,8 +7,9 @@ let () =
     Operations.run_program cfg;
   end
   with 
-  | InputDetector.Failed_to_detect -> 
-      print_endline "bad input from file or stdin";
+  | InputDetector.Failed_to_detect(x) -> 
+      print_endline "terrible input from file or stdin";
+      Printf.printf "Error: %s\n" x;
   | Sys_error(_) ->
-      print_endline "most likely bad input file provided but who knows we aren't
-handling this case thoroughly";
+      print_endline "most likely terrible input file provided but who knows we
+aren't handling this case thoroughly";
