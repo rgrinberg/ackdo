@@ -10,4 +10,5 @@ Executable ackdo
   BuildTools: ocamlbuild
   BuildDepends: batteries
   MainIs:     main.ml
+  CompiledObject: native
   

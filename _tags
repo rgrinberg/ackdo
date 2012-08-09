@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: 75db01dbbd057f529b7e2f8bfa40ee00)
+# DO NOT EDIT (digest: c9109fe2a794ab9021d42bb5efff3efe)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -14,6 +14,6 @@
 "_darcs": -traverse
 "_darcs": not_hygienic
 # Executable ackdo
-"main.byte": pkg_batteries
+"main.native": pkg_batteries
 <*.ml{,i}>: pkg_batteries
 # OASIS_STOP
