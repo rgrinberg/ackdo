@@ -1,25 +1,17 @@
 open Ackdo
 open Batteries
 
-let pp_file ~file ~parser_f = 
-  let changes = parser_f
-                ~lines:(BatFile.lines_of file)
-                ~cwd:"." in
-  let cwd = Unix.getcwd () in
-  print_endline file;
-  print_endline "---------------------";
-  changes |> Enum.iter ( fun { file ; changes } -> 
-    Printf.printf "--> %s\n" file;
-    changes |> Enum.iter ( fun { change_line ; new_line } ->
-      Printf.printf "%d:%s\n" change_line new_line) )
-
-let () = 
-  let file = "/home/rudi/prog/ocaml/ackdo/testout.txt" in
-  pp_file ~file ~parser_f:Grouped.parse_changes
-
-let () = 
-  let file = "/home/rudi/prog/ocaml/ackdo/testout2.txt" in
-  pp_file ~file ~parser_f:Ungrouped.parse_changes
+let () =
+  try begin
+    let cfg = CmdArgs.read_args () in
+    Operations.run_program cfg;
+  end
+  with 
+  | InputDetector.Failed_to_detect -> 
+      print_endline "bad input from file or stdin";
+  | Sys_error(_) ->
+      print_endline "most likely bad input file provided but who knows we aren't
+handling this case thoroughly";
 
 (*
  *the options this program takes are:

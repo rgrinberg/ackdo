@@ -1,11 +1,11 @@
 open Batteries
-
 type change_list =
   { file : string;
     changes : change Enum.t }
 and change =
   { change_line : int;
     new_line : string; }
+(*change_list is converted to commit*)
 type commit = 
   { path : string;
     lines : string Enum.t; }
@@ -35,9 +35,11 @@ module Display = struct
   let diff_out ~minus_line ~plus_line = "- " ^ minus_line ^ "\n+ " ^ plus_line
   let display_diffs ~file ~diffs =
     print_endline ("--> " ^ file);
-    diffs |> Enum.iter (fun { line; minus_line; plus_line } ->
-      print_endline ((string_of_int line) ^ ":");
-      print_endline (diff_out ~minus_line ~plus_line))
+    match diffs |> Enum.peek with
+    | None -> print_endline "[0 changes]";
+    | Some(_) -> diffs |> Enum.iter (fun { line; minus_line; plus_line } ->
+        print_endline ((string_of_int line) ^ ":");
+        print_endline (diff_out ~minus_line ~plus_line))
 end
 
 module Commit = struct 
@@ -68,10 +70,12 @@ module Commit = struct
             let line_number = succ line_number_minus_one in
             try begin
               let new_line = Hashtbl.find change_hash line_number in
-              previews := { line=line_number;
-                            minus_line=old_line;
-                            plus_line=new_line; } :: !previews;
-              new_line
+              if new_line <> old_line then begin
+                previews := { line=line_number;
+                              minus_line=old_line;
+                              plus_line=new_line; } :: !previews;
+                new_line end
+              else old_line
             end with Not_found -> old_line ) |> List.of_enum
       in ({ path=file; lines=(List.enum new_lines) }
             ,List.rev !previews)
@@ -82,16 +86,16 @@ module Commit = struct
 end
 
 module StrMisc = struct
-  let blank_str =
-    let re = Str.regexp "^ *$" in
-    (fun x -> Str.string_match re x 0)
+  let create_matcher re = 
+    let r = Str.regexp re in
+    (fun x -> Str.string_match r x 0)
+  let blank_str = create_matcher "^ *$"
+  let grouped_match = create_matcher "^[1-9][0-9]*:.+$" 
+  let ungrouped_detect = create_matcher "^.+:[0-9]+:.+$" 
+  let grouped_filepath = create_matcher "^.+$"
 end
 
 module Grouped : Read = struct 
-  let is_line = 
-    let re = Str.regexp "^[0-9]+:.+$" in
-    (fun x -> Str.string_match re x 0)
-
   let split_f f l =
     let unmerged = l |> Enum.group_by (fun a b -> (f a) = (f b))
      in Enum.from (fun () ->
@@ -111,7 +115,7 @@ module Grouped : Read = struct
 
   let parse_changes ~lines ~cwd = lines
     |> Enum.filter (not -| StrMisc.blank_str) 
-    |> split_f (not -| is_line)
+    |> split_f (not -| StrMisc.grouped_match)
     |> Enum.map ( fun (f, changes) ->
        let file =  Filename.concat cwd f in
        { file; changes=(changes |> Enum.map parse_change) })
@@ -139,6 +143,26 @@ module Ungrouped : Read = struct
         in { file; changes=(e |> Enum.map snd) })
 end
 
+module InputDetector = struct
+  type input_match = Full | File | Line | Unknown
+  exception Failed_to_detect
+  let line_marker line =
+    let open StrMisc in
+    if ungrouped_detect line then Full
+    else if grouped_match line then Line
+    else if grouped_filepath line then File
+    else Unknown
+
+  let detect_input input =
+    (*we don't to want to "mutate" input*)
+    let e = input |> Enum.clone |> Enum.filter StrMisc.blank_str
+                  |> Enum.take 10 |> Enum.map line_marker in
+    if e |> Enum.for_all ( fun x -> x = Full ) then (module Ungrouped : Read)
+    else if ((e |> Enum.get_exn) = File) && (( e |> Enum.get_exn) = Line)
+    then (module Grouped : Read)
+    else raise Failed_to_detect
+end
+
 module Operations = struct
   (*
    *this module does what the user wants and prints the results. However it does
@@ -151,18 +175,45 @@ module Operations = struct
     | [] -> () | xs -> raise (Bad_paths xs)
 
   let run_program { input=lines ; input_parser ; action ; cwd } = 
-    let module IP = (val input_parser : Read) in
-    let change_lists = IP.parse_changes ~lines ~cwd in
+    let change_lists = 
+      let module IP = (val input_parser : Read) in
+      IP.parse_changes ~lines ~cwd in
     try
-      change_lists |> Enum.map ( fun { file; _ } -> file ) |> verify_paths;
+      change_lists |> Enum.clone |> Enum.map ( fun { file; _ } -> file ) |> verify_paths;
       let changes = change_lists |> Enum.map Commit.file_of_changes in
       match action with
       | Preview -> changes |> Enum.iter ( fun ({path=file;_}, preview_list) ->
-            Display.display_diffs ~file ~diffs:(List.enum preview_list) )
-      | Commit -> changes |> Enum.map fst |> Commit.write_all_changes
+            Display.display_diffs ~file ~diffs:(List.enum preview_list) );
+      | Commit -> 
+        (*extract all the files that actually have changes and write those*)
+        changes 
+        |> Enum.filter ( fun (_,preview_l) -> (List.length preview_l) > 0 )
+        |> Enum.map fst |> Commit.write_all_changes
     with Bad_paths(p) -> begin
       print_endline "looks like you supplied bad paths. perhaps cwd is wrong?";
       p |> List.iter ( fun path -> Printf.printf "'%s' does not exist\n" path )
     end
 end
 
+module CmdArgs = struct
+  let usage = "usage: " ^ Sys.argv.(0) ^ " [-d] [-f file] [-c directory]"
+  let read_args () = 
+    let action = ref Preview in
+    let input = ref (IO.lines_of stdin) in
+    let cwd = ref (Unix.getcwd ()) in
+    let speclist = [
+      ("-d", Arg.Unit ( fun () -> action := Commit ), ": -d to commit. nothing to
+      preview" );
+      ("-f", Arg.String ( fun s -> input := (BatFile.lines_of s) ), ": -f read
+      input from some file instead of stdin");
+      ("-c", Arg.String (fun d -> cwd := d ), ": force cwd to be argument" )
+     ] in
+    Arg.parse 
+      speclist 
+      (fun x -> raise (Arg.Bad ("Bad argument : " ^ x)))
+      usage;
+    let open InputDetector in
+    let module IP = (val (detect_input !input) : Read) in
+    { action=(!action) ; input_parser=(module IP : Read); input=(!input) ;
+      cwd=(!cwd) }
+end
