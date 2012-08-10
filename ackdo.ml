@@ -1,6 +1,6 @@
 open Batteries
 
-let () = Printexc.record_backtrace true
+(*let () = Printexc.record_backtrace true*)
 
 type change_list =
   { file : string;
