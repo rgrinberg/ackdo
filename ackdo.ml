@@ -13,8 +13,8 @@ type commit =
   { path : string;
     lines : string Enum.t; }
 (*
- *we must stick this module declaration here for now until I learn how to define
- *types and module signatures recursively
+ *we must stick this module declaration here for now until I learn how
+ *to define types and module signatures recursively
  *)
 module type Read = sig
   val parse_changes : lines:string Enum.t -> cwd:string -> change_list Enum.t
@@ -47,8 +47,9 @@ end
 
 module Commit = struct 
   (*
-   *converts a 'change list' into a Hashtbl that makes it easy to access changes
-   *corresponding to specific lines and remove changes once they are committed 
+   *converts a 'change list' into a Hashtbl that makes it easy to access
+   *cochanges rresponding to specific lines and remove changes once they
+   *coare committed
    *)
   let prepare_changes changes =
     let chash = Hashtbl.create 10 in
@@ -165,27 +166,19 @@ module InputDetector = struct
     (*we don't to want to "mutate" input*)
     let e = input |> Enum.clone |> Enum.filter (not -| StrMisc.blank_str)
                   |> Enum.take 10 |> Enum.map line_marker |> List.of_enum in
-    (*let e = input |> Enum.clone |> Enum.filter (not -| StrMisc.blank_str)*)
-                  (*|> Enum.take 10 |> List.of_enum in*)
-    (*print_endline "printing list:::";*)
-    (*e |> List.iter print_endline;*)
-    (*let e = e |> List.map line_marker in*)
     if e |> List.for_all ( fun x -> x = Full ) 
     then (module Ungrouped : Read)
     else match e with
       | File::Line::xs -> (module Grouped : Read)
       | [] -> raise (Failed_to_detect "Received empty list, what gives?")
-      | _ ->
-          (*Printf.printf "len is: %d\n" (List.length e);*)
-          (*e |> List.iter ( fun x -> print_endline (string_of_match x) );*)
-          raise (Failed_to_detect "Bad input")
+      | _ -> raise (Failed_to_detect "Bad input")
 end
 
 module Operations = struct
   (*
-   *this module does what the user wants and prints the results. However it does
-   *not read in the user's options and assumes those settings have been passed
-   *down
+   *this module does what the user wants and prints the results. However
+   *it does not read in the user's options and assumes those settings
+   *have been passed down
    *)
   exception Bad_paths of string list
   let verify_paths paths =
@@ -244,8 +237,9 @@ module CmdArgs = struct
       (fun x -> raise (Arg.Bad ("Bad argument : " ^ x)))
       usage;
     (*
-     *we set the current directory to the parent of the input file's path in the
-     *case when user specified an input file but did not set an explicit cwd
+     *we set the current directory to the parent of the input file's
+     *path in the case when user specified an input file but did not set
+     *an explicit cwd
      *)
     (match (!input_file) with
     | Some f when (not (!forced_cwd)) -> cwd := Filename.dirname f
