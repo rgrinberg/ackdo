@@ -1,23 +1,83 @@
-open Batteries
+let (|>) g f = f g
+let (-|) g f = fun x -> x |> f |> g 
 
 (*let () = Printexc.record_backtrace true*)
+module MyList = struct
+  include List
+
+  let map_by_two f l = 
+    let rec loop acc = function
+      | x::y::xs -> loop ((f x y)::acc) xs
+      | x::[] -> failwith "Odd number of elements"
+      | [] -> List.rev acc
+    in loop [] l
+
+  let take x l = 
+    let rec loop acc count l =
+      if count = 0 then List.rev acc
+      else match l with
+      | x::xs -> loop (x::acc) (pred count) xs
+      (*
+       *if there are not enough elements we return what we have instead
+       *of throwing an error
+       *)
+      | [] -> List.rev acc
+    in loop [] x l
+
+  let group_by f l = 
+    let rec loop acc current_acc last = function
+      | (x::xs) as l ->
+          begin match last with
+          | Some (last_e) -> 
+              if (f x last_e)
+              then loop acc (x::current_acc) (Some x) xs
+              else loop ((List.rev current_acc)::acc) [] None l
+          | None -> loop acc [x] (Some x) xs
+          end
+      | [] -> List.rev ((List.rev current_acc)::acc)
+    in match l with 
+    | [] -> []
+    | xs -> loop [] [] None xs
+end
+
+module List = MyList
+
+module Misc = struct
+
+  let read_lines_in chan = 
+    let rec loop l = 
+      try loop ((input_line chan) :: l)
+      with End_of_file -> close_in chan; List.rev l
+    in loop []
+
+  let read_lines path = 
+    let chan = open_in path in
+    read_lines_in chan
+
+  let write_lines path lines = 
+    let oc = open_out path in
+    List.iter (fun l -> 
+      Printf.fprintf oc "%s\n" l;
+    ) lines; close_out oc
+end
+
 
 type change_list =
   { file : string;
-    changes : change Enum.t }
+    changes : change list }
 and change =
   { change_line : int;
     new_line : string; }
 (*change_list is converted to commit*)
 type commit = 
   { path : string;
-    lines : string Enum.t; }
+    lines : string list; }
 (*
  *we must stick this module declaration here for now until I learn how
  *to define types and module signatures recursively
  *)
 module type Read = sig
-  val parse_changes : lines:string Enum.t -> cwd:string -> change_list Enum.t
+  val parse_changes : lines:string list -> cwd:string -> change_list list
 end
 type preview =
   { line : int;
@@ -26,7 +86,7 @@ type preview =
 
 (*contains all the necessary information needed to run the program*)
 type conf = 
-  { input : string Enum.t;
+  { input : string list;
     input_parser : (module Read);
     action : action;
     cwd : string; }
@@ -38,9 +98,9 @@ module Display = struct
   let diff_out ~minus_line ~plus_line = "- " ^ minus_line ^ "\n+ " ^ plus_line
   let display_diffs ~file ~diffs =
     print_endline ("--> " ^ file);
-    match diffs |> Enum.peek with
-    | None -> print_endline "[0 changes]";
-    | Some(_) -> diffs |> Enum.iter (fun { line; minus_line; plus_line } ->
+    match diffs with
+    | [] -> print_endline "[0 changes]";
+    | xs -> diffs |> List.iter (fun { line; minus_line; plus_line } ->
         print_endline ((string_of_int line) ^ ":");
         print_endline (diff_out ~minus_line ~plus_line))
 end
@@ -53,7 +113,7 @@ module Commit = struct
    *)
   let prepare_changes changes =
     let chash = Hashtbl.create 10 in
-    changes |> Enum.iter ( fun { change_line; new_line } ->
+    changes |> List.iter ( fun { change_line; new_line } ->
       if Hashtbl.mem chash change_line
       then failwith "Cannot have duplicate line edits on same file"
       else Hashtbl.add chash change_line new_line
@@ -67,8 +127,8 @@ module Commit = struct
     then
       let previews = ref [] in
       let change_hash = prepare_changes changes in
-      let new_lines = file |> BatFile.lines_of
-        |> Enum.mapi ( fun line_number_minus_one old_line -> 
+      let new_lines = file |> Misc.read_lines
+        |> List.mapi ( fun line_number_minus_one old_line -> 
             (*line_number_minus_one starts counting at 0 so we must
              * increment it*)
             let line_number = succ line_number_minus_one in
@@ -80,13 +140,13 @@ module Commit = struct
                               plus_line=new_line; } :: !previews;
                 new_line end
               else old_line
-            end with Not_found -> old_line ) |> List.of_enum
-      in ({ path=file; lines=(List.enum new_lines) }
+            end with Not_found -> old_line )
+      in ({ path=file; lines=new_lines }
             ,List.rev !previews)
     else raise (File_does_not_exist file)
-  (*warning: untested*)
-  let write_changes { path ; lines } = BatFile.write_lines path lines
-  let write_all_changes cg = cg |> Enum.iter write_changes
+  let write_changes { path ; lines } =
+    Misc.write_lines path lines
+  let write_all_changes cg = cg |> List.iter write_changes
 end
 
 module StrMisc = struct
@@ -100,14 +160,10 @@ module StrMisc = struct
 end
 
 module Grouped : Read = struct 
+
   let split_f f l =
-    let unmerged = l |> Enum.group_by (fun a b -> (f a) = (f b))
-    in Enum.from (fun () ->
-      match (Enum.get unmerged, Enum.get unmerged) with
-      | Some(x),Some(y) -> (Enum.get_exn x, y)
-      | None, None -> raise BatEnum.No_more_elements;
-      | Some(_), None -> failwith "Odd number of elements. This is bullshit."
-      | None, Some(_) -> failwith "broke the matrix")
+    let unmerged = l |> List.group_by (fun a b -> (f a) = (f b))
+    in unmerged |> List.map_by_two (fun x y -> (List.hd x, y))
 
   let parse_change = 
     let re = Str.regexp "^\([0-9]+\):\(.+\)$" in
@@ -118,11 +174,11 @@ module Grouped : Read = struct
         new_line=(matched_group 2 line) })
 
   let parse_changes ~lines ~cwd = lines
-    |> Enum.filter (not -| StrMisc.blank_str) 
+    |> List.filter (not -| StrMisc.blank_str) 
     |> split_f (not -| StrMisc.grouped_match)
-    |> Enum.map ( fun (f, changes) ->
-       let file =  Filename.concat cwd f in
-       { file; changes=(changes |> Enum.map parse_change) })
+    |> List.map ( fun (f, changes) ->
+       let file = Filename.concat cwd f in
+       { file; changes=(changes |> List.map parse_change) })
 end
 
 module Ungrouped : Read = struct
@@ -136,15 +192,15 @@ module Ungrouped : Read = struct
         new_line=(matched_group 3 line) }) )
 
   let parse_changes ~lines ~cwd = lines
-    |> Enum.filter (not -| StrMisc.blank_str)
-    |> Enum.map parse_change
-    |> Enum.group_by (fun (a,_) (b,_) -> a = b)
-    |> Enum.map (fun e ->
+    |> List.filter (not -| StrMisc.blank_str)
+    |> List.map parse_change
+    |> List.group_by (fun (a,_) (b,_) -> a = b)
+    |> List.map (fun e ->
         let file = Filename.concat cwd
-          (match (Enum.peek e) with 
-          | Some(f, _) -> f
-          | None -> failwith "wtf this is bullshit")
-        in { file; changes=(e |> Enum.map snd) })
+          (match e with 
+          | (f,_)::_ -> f
+          | [] -> failwith "wtf this is bullshit")
+        in { file; changes=(e |> List.map snd) })
 end
 
 module InputDetector = struct
@@ -154,7 +210,9 @@ module InputDetector = struct
     | Full -> "full"
     | Line -> "line"
     | Unknown -> "unknown"
+
   exception Failed_to_detect of string
+  
   let line_marker line =
     let open StrMisc in
     if ungrouped_detect line then Full
@@ -164,8 +222,8 @@ module InputDetector = struct
 
   let detect_input input =
     (*we don't to want to "mutate" input*)
-    let e = input |> Enum.clone |> Enum.filter (not -| StrMisc.blank_str)
-                  |> Enum.take 10 |> Enum.map line_marker |> List.of_enum in
+    let e = input |> List.filter (not -| StrMisc.blank_str)
+                  |> List.take 10 |> List.map line_marker in
     if e |> List.for_all ( fun x -> x = Full ) 
     then (module Ungrouped : Read)
     else match e with
@@ -182,25 +240,25 @@ module Operations = struct
    *)
   exception Bad_paths of string list
   let verify_paths paths =
-    match paths |> Enum.filter (not -| Sys.file_exists ) |> List.of_enum with
+    match paths |> List.filter (not -| Sys.file_exists ) with
     | [] -> () | xs -> raise (Bad_paths xs)
 
   let run_program { input=lines ; input_parser ; action ; cwd } = 
     let change_lists = 
       let module IP = (val input_parser : Read) in
-      IP.parse_changes ~lines ~cwd in
+      (IP.parse_changes ~lines ~cwd) in
     try
-      change_lists |> Enum.clone 
-      |> Enum.map ( fun { file; _ } -> file ) |> verify_paths;
-      let changes = change_lists |> Enum.map Commit.file_of_changes in
+      change_lists
+      |> List.map ( fun { file; _ } -> file ) |> verify_paths;
+      let changes = change_lists |> List.map Commit.file_of_changes in
       match action with
-      | Preview -> changes |> Enum.iter ( fun ({path=file;_}, preview_list) ->
-            Display.display_diffs ~file ~diffs:(List.enum preview_list) );
+      | Preview -> changes |> List.iter ( fun ({path=file;_}, preview_list) ->
+            Display.display_diffs ~file ~diffs:preview_list );
       | Commit -> 
         (*extract all the files that actually have changes and write those*)
         changes 
-        |> Enum.filter ( fun (_,preview_l) -> (List.length preview_l) > 0 )
-        |> Enum.map fst |> Commit.write_all_changes
+        |> List.filter ( fun (_,preview_l) -> (List.length preview_l) > 0 )
+        |> List.map fst |> Commit.write_all_changes
     with Bad_paths(p) -> begin
       print_endline "looks like you supplied bad paths. perhaps cwd is wrong?";
       p |> List.iter ( fun path -> Printf.printf "'%s' does not exist\n" path )
@@ -212,7 +270,7 @@ module CmdArgs = struct
   let read_args () = 
     let input_file = ref None in
     let action = ref Preview in
-    let input = ref (IO.lines_of stdin) in
+    let input = ref (stdin |> Misc.read_lines_in ) in
     let cwd = ref (Unix.getcwd ()) in
     let forced_cwd = ref false in
     let speclist = [
@@ -223,7 +281,7 @@ module CmdArgs = struct
         if not (Sys.file_exists s) then
           raise (Arg.Bad ("File doesn't exist:" ^ s))
         else begin
-          input := (BatFile.lines_of s);
+          input := (Misc.read_lines s);
           input_file :=  Some(s);
         end
         ), ": -f read

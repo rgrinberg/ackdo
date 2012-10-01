@@ -1,5 +1,4 @@
 open Ackdo
-open Batteries
 
 let () =
   try begin
