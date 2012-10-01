@@ -270,7 +270,7 @@ module CmdArgs = struct
   let read_args () = 
     let input_file = ref None in
     let action = ref Preview in
-    let input = ref (stdin |> Misc.read_lines_in ) in
+    let input = ref [] in
     let cwd = ref (Unix.getcwd ()) in
     let forced_cwd = ref false in
     let speclist = [
@@ -284,8 +284,7 @@ module CmdArgs = struct
           input := (Misc.read_lines s);
           input_file :=  Some(s);
         end
-        ), ": -f read
-      input from some file instead of stdin");
+        ), ": -f read input from some file instead of stdin");
 
       ("-c", Arg.String (fun d -> cwd := d; forced_cwd := true ),
        ": force cwd to be argument" )
@@ -299,6 +298,7 @@ module CmdArgs = struct
      *path in the case when user specified an input file but did not set
      *an explicit cwd
      *)
+    input := (stdin |> Misc.read_lines_in );
     (match (!input_file) with
     | Some f when (not (!forced_cwd)) -> cwd := Filename.dirname f
     | Some _ | None -> ());
