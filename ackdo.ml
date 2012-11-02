@@ -2,7 +2,7 @@ let (|>) g f = f g
 let (-|) g f = fun x -> x |> f |> g 
 
 (*let () = Printexc.record_backtrace true*)
-module MyList = struct
+module List = struct
   include List
 
   let map_by_two f l = 
@@ -39,8 +39,6 @@ module MyList = struct
     | [] -> []
     | xs -> loop [] [] None xs
 end
-
-module List = MyList
 
 module Misc = struct
 
@@ -206,9 +204,9 @@ end
 module InputDetector = struct
   type input_match = Full | File | Line | Unknown
   let string_of_match = function
-    | File -> "file"
-    | Full -> "full"
-    | Line -> "line"
+    | File    -> "file"
+    | Full    -> "full"
+    | Line    -> "line"
     | Unknown -> "unknown"
 
   exception Failed_to_detect of string
