@@ -86,36 +86,30 @@ type preview =
 type conf = 
   { input : string list;
     input_parser : (module Read);
+    diff_out : minus_line:string -> plus_line:string -> string;
     action : action;
     cwd : string; }
 and action = Preview | Commit
 
 exception File_does_not_exist of string
 
-module type LineDiff = sig
-  val diff_out : minus_line:string -> plus_line:string -> string
+
+module Diffs = struct
+  let color ~minus_line ~plus_line = 
+    "{- " ^ minus_line ^ "\n+ " ^ plus_line ^ "}"
+  let black_white ~minus_line ~plus_line =
+    "- " ^ minus_line ^ "\n+ " ^ plus_line
 end
 
-module BlackWhiteLineDiff : LineDiff = struct
-  let diff_out ~minus_line ~plus_line = "- " ^ minus_line ^ "\n+ " ^ plus_line
-end
-
-module ColorDiff : LineDiff = struct
-  let diff_out ~minus_line ~plus_line = "- " ^ minus_line ^ "\n+ " ^ plus_line
-end
-
-module Display (D : LineDiff) = struct
-  open D
-  let display_diffs ~file ~diffs =
+module Display = struct
+  let display_diffs ~file ~diffs ~diff_out =
     print_endline ("--> " ^ file);
     match diffs with
     | [] -> print_endline "[0 changes]";
-    | xs -> diffs |> List.iter (fun { line; minus_line; plus_line } ->
+    | _ -> diffs |> List.iter (fun { line; minus_line; plus_line } ->
         print_endline ((string_of_int line) ^ ":");
         print_endline (diff_out ~minus_line ~plus_line))
 end
-
-module SimpleDisplay = Display(BlackWhiteLineDiff)
 
 module Commit = struct 
   (*
@@ -238,7 +232,7 @@ module InputDetector = struct
     if e |> List.for_all ( fun x -> x = Full ) 
     then (module Ungrouped : Read)
     else match e with
-      | File::Line::xs -> (module Grouped : Read)
+      | File::Line::_ -> (module Grouped : Read)
       | [] -> raise (Failed_to_detect "Received empty list, what gives?")
       | _ -> raise (Failed_to_detect "Bad input")
 end
@@ -254,7 +248,7 @@ module Operations = struct
     match paths |> List.filter (not -| Sys.file_exists ) with
     | [] -> () | xs -> raise (Bad_paths xs)
 
-  let run_program { input=lines ; input_parser ; action ; cwd } = 
+  let run_program { input=lines ; input_parser ; action ; cwd ; diff_out } = 
     let change_lists = 
       let module IP = (val input_parser : Read) in
       (IP.parse_changes ~lines ~cwd) in
@@ -264,7 +258,7 @@ module Operations = struct
       let changes = change_lists |> List.map Commit.file_of_changes in
       match action with
       | Preview -> changes |> List.iter ( fun ({path=file;_}, preview_list) ->
-          SimpleDisplay.display_diffs ~file ~diffs:preview_list );
+          Display.display_diffs ~file ~diffs:preview_list ~diff_out );
       | Commit -> 
         (*extract all the files that actually have changes and write those*)
         changes 
@@ -277,13 +271,14 @@ module Operations = struct
 end
 
 module CmdArgs = struct
-  let usage = "usage: " ^ Sys.argv.(0) ^ " [-d] [-f file] [-c directory]"
+  let usage = "usage: " ^ Sys.argv.(0) ^ " [-d] [-f file] [-c directory] [-r]"
   let read_args () = 
     let input_file = ref None in
     let action     = ref Preview in
     let input      = ref [] in
     let cwd        = ref (Unix.getcwd ()) in
     let forced_cwd = ref false in
+    let printer    = ref Diffs.black_white in
     let speclist = [
       ("-d", Arg.Unit ( fun () -> action := Commit ), ": -d to commit. nothing
       to preview" );
@@ -298,7 +293,10 @@ module CmdArgs = struct
         ), ": -f read input from some file instead of stdin");
 
       ("-c", Arg.String (fun d -> cwd := d; forced_cwd := true ),
-       ": force cwd to be argument" )
+       ": force cwd to be argument" );
+
+      ("-r", Arg.Unit ( fun () -> printer := Diffs.color ),
+        ": turn on color output" );
      ] in
     Arg.parse 
       speclist 
@@ -316,5 +314,5 @@ module CmdArgs = struct
     let open InputDetector in
     let module IP = (val (detect_input !input) : Read) in
     { action=(!action) ; input_parser=(module IP : Read); input=(!input) ;
-      cwd=(!cwd) }
+      cwd=(!cwd) ; diff_out=(!printer) }
 end
