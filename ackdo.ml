@@ -92,8 +92,20 @@ and action = Preview | Commit
 
 exception File_does_not_exist of string
 
-module Display = struct
+module type LineDiff = sig
+  val diff_out : minus_line:string -> plus_line:string -> string
+end
+
+module BlackWhiteLineDiff : LineDiff = struct
   let diff_out ~minus_line ~plus_line = "- " ^ minus_line ^ "\n+ " ^ plus_line
+end
+
+module ColorDiff : LineDiff = struct
+  let diff_out ~minus_line ~plus_line = "- " ^ minus_line ^ "\n+ " ^ plus_line
+end
+
+module Display (D : LineDiff) = struct
+  open D
   let display_diffs ~file ~diffs =
     print_endline ("--> " ^ file);
     match diffs with
@@ -102,6 +114,8 @@ module Display = struct
         print_endline ((string_of_int line) ^ ":");
         print_endline (diff_out ~minus_line ~plus_line))
 end
+
+module SimpleDisplay = Display(BlackWhiteLineDiff)
 
 module Commit = struct 
   (*
@@ -250,7 +264,7 @@ module Operations = struct
       let changes = change_lists |> List.map Commit.file_of_changes in
       match action with
       | Preview -> changes |> List.iter ( fun ({path=file;_}, preview_list) ->
-            Display.display_diffs ~file ~diffs:preview_list );
+          SimpleDisplay.display_diffs ~file ~diffs:preview_list );
       | Commit -> 
         (*extract all the files that actually have changes and write those*)
         changes 
