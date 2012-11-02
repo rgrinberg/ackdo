@@ -219,7 +219,6 @@ module InputDetector = struct
     else Unknown
 
   let detect_input input =
-    (*we don't to want to "mutate" input*)
     let e = input |> List.filter (not -| StrMisc.blank_str)
                   |> List.take 10 |> List.map line_marker in
     if e |> List.for_all ( fun x -> x = Full ) 
