@@ -95,8 +95,9 @@ exception File_does_not_exist of string
 
 
 module Diffs = struct
+  (* TODO : haven't implement color diff yet *)
   let color ~minus_line ~plus_line = 
-    "{- " ^ minus_line ^ "\n+ " ^ plus_line ^ "}"
+    "- " ^ minus_line ^ "\n+ " ^ plus_line
   let black_white ~minus_line ~plus_line =
     "- " ^ minus_line ^ "\n+ " ^ plus_line
 end
