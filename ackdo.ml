@@ -24,6 +24,12 @@ module List = struct
       | [] -> List.rev acc
     in loop [] x l
 
+  let mapi f a = 
+    let rec loop acc i = function
+      | [] -> List.rev acc
+      | x::xs -> loop ((f i x)::acc) (succ i) xs
+    in loop [] 0 a
+
   let group_by f l = 
     let rec loop acc current_acc last = function
       | (x::xs) as l ->
@@ -96,8 +102,7 @@ exception File_does_not_exist of string
 
 module Diffs = struct
   (* TODO : haven't implement color diff yet *)
-  let color ~minus_line ~plus_line = 
-    "- " ^ minus_line ^ "\n+ " ^ plus_line
+  let color ~minus_line ~plus_line = failwith "Not implemented yet"
   let black_white ~minus_line ~plus_line =
     "- " ^ minus_line ^ "\n+ " ^ plus_line
 end
