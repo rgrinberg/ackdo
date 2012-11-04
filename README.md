@@ -5,7 +5,7 @@ sed (or a similar tool) to ack's (or grep's) direct output
 
 ### Installing
 
-To install simply run the following: (ocaml is the only prereq)
+To install simply run the following: (OCaml >= 3.12 is the only prereq)
 ```
 $ make
 $ sudo make install
