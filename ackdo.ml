@@ -143,12 +143,13 @@ exception File_does_not_exist of string
 
 module Diffs = struct
   (* TODO : haven't implement color diff yet *)
+  let color_line x lcs y = 
+    let open ANSIColor in x ^ (apply [red] lcs) ^ y
   let color ~minus_line ~plus_line = 
     let lcs = LCS.lcs minus_line plus_line in
     let (m1, m2) = String.split minus_line ~by:lcs in
     let (p1, p2) = String.split plus_line ~by:lcs in
-    let open ANSIColor in
-    "-" ^ (apply [red] minus_line) ^ "\n+" ^ plus_line 
+    "-" ^ (color_line m1 lcs m2) ^ "\n+" ^ (color_line p1 lcs p2)
 
   let black_white ~minus_line ~plus_line =
     "- " ^ minus_line ^ "\n+ " ^ plus_line
