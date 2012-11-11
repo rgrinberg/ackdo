@@ -1,3 +1,6 @@
+(*credits lib go to:http://opam.ocamlpro.com/pkg/ansicolor.0.5.html *)
+
+
 (** ANSIColor is a simple library for coloring strings in a terminal with
     ANSI colors. *)
 

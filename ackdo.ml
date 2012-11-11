@@ -46,6 +46,15 @@ module List = struct
     | xs -> loop [] [] None xs
 end
 
+module String = struct
+  include String
+  let split s ~by = 
+    if by = "" then (s, "") else
+      let re = Str.regexp ("\(^.*\)" ^ (Str.quote by) ^ "\(.*\)$") in
+      let smatch = Str.string_match re s 0 in
+      if not smatch then raise Not_found
+      else Str.(matched_group 1 s, matched_group 1 s)
+end                             
 
 module LCS = struct 
   (*inefficient crap. rewrite later*)
@@ -134,7 +143,13 @@ exception File_does_not_exist of string
 
 module Diffs = struct
   (* TODO : haven't implement color diff yet *)
-  let color ~minus_line ~plus_line = failwith "Not implemented yet"
+  let color ~minus_line ~plus_line = 
+    let lcs = LCS.lcs minus_line plus_line in
+    let (m1, m2) = String.split minus_line ~by:lcs in
+    let (p1, p2) = String.split plus_line ~by:lcs in
+    let open ANSIColor in
+    "-" ^ (apply [red] minus_line) ^ "\n+" ^ plus_line 
+
   let black_white ~minus_line ~plus_line =
     "- " ^ minus_line ^ "\n+ " ^ plus_line
 end
