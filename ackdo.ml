@@ -8,7 +8,7 @@ module List = struct
   let map_by_two f l = 
     let rec loop acc = function
       | x::y::xs -> loop ((f x y)::acc) xs
-      | x::[] -> failwith "Odd number of elements"
+      | _::[] -> failwith "Odd number of elements"
       | [] -> List.rev acc
     in loop [] l
 
