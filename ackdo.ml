@@ -84,6 +84,8 @@ module LCS = struct
     done;
     a.(0).(0)
 
+
+  (*NOTE: this lcs is actually lowest common subsequence not string. fix later*)
   let lcs xs ys = 
     (lcs' (list_of_string xs) (list_of_string ys)) |> string_of_list
 end
@@ -169,8 +171,8 @@ end
 module Commit = struct 
   (*
    *converts a 'change list' into a Hashtbl that makes it easy to access
-   *cochanges rresponding to specific lines and remove changes once they
-   *coare committed
+   *changes corresponding to specific lines and remove changes once they
+   *are committed
    *)
   let prepare_changes changes =
     let chash = Hashtbl.create 10 in
