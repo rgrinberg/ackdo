@@ -225,7 +225,6 @@ module StrMisc = struct
 end
 
 module Grouped : Read = struct 
-
   let split_f f l =
     let unmerged = l |> List.group_by (fun a b -> (f a) = (f b))
     in unmerged |> List.map_by_two (fun x y -> (List.hd x, y))
