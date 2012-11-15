@@ -246,8 +246,15 @@ module Grouped : Read = struct
 end
 
 module Ungrouped : Read = struct
+  (*
+   *We assume that all of the following characters cannot occur in the filepath.
+   *This is of course a false assumption for Unix but it makes the change matcher
+   *a lot more robust in practice. It also works well enough for real world
+   *applications
+   *)
+  let disallowed_chars = Str.quote "()\"'"
   let parse_change =
-    let re = Str.regexp "^\(.+\):\([0-9]+\):\(.+\)$" in
+    let re = Str.regexp ("^\([^"^ disallowed_chars ^"]+\):\([0-9]+\):\(.+\)$") in
     (fun line ->
       (Str.string_match re line 0) |> ignore;
       let open Str in
