@@ -3,6 +3,10 @@ let (-|) g f = fun x -> x |> f |> g
 
 (*let () = Printexc.record_backtrace true*)
 module List = struct
+  (*
+   *we would like a slim list of dependencies, hence we have to reinvent a few
+   *wheels here
+   *)
   include List
 
   let map_by_two f l = 
@@ -90,7 +94,6 @@ module LCS = struct
 end
 
 module Misc = struct
-
   let read_lines_in chan = 
     let rec loop l = 
       try loop ((input_line chan) :: l)
