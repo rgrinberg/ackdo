@@ -24,6 +24,7 @@ module List = struct
       | [] -> List.rev acc
     in loop [] x l
 
+  (* compatibility for 3.12 *)
   let mapi f a = 
     let rec loop acc i = function
       | [] -> List.rev acc
@@ -64,8 +65,7 @@ module LCS = struct
   let list_of_string str =
     let result = ref [] in
     String.iter (fun x -> result := x :: !result)
-                str;
-    List.rev !result
+    str; List.rev !result
  
   let string_of_list lst =
     let result = String.create (List.length lst) in
