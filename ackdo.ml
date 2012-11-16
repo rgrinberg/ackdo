@@ -51,6 +51,16 @@ module List = struct
     | xs -> loop [] [] None xs
 end
 
+module Console = struct
+  (*ripped off from stackoverflow*)
+  let get1char () =
+    let termio = Unix.tcgetattr Unix.stdin in
+    let () = Unix.tcsetattr Unix.stdin Unix.TCSADRAIN 
+    { termio with Unix.c_icanon = false } in
+    let res = input_char stdin in
+    let () = Unix.tcsetattr Unix.stdin Unix.TCSADRAIN termio in res
+end
+
 module String = struct
   include String
   let split s ~by = 
