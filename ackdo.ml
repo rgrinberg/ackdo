@@ -239,7 +239,7 @@ module Grouped : Read = struct
 
   let parse_change = 
     let re = Str.regexp "^\([0-9]+\):\(.+\)$" in
-    (fun line -> 
+    (fun line ->
       (Str.string_match re line 0) |> ignore;
       let open Str in
       { change_line=((matched_group 1 line) |> int_of_string );
@@ -251,6 +251,26 @@ module Grouped : Read = struct
     |> List.map ( fun (f, changes) ->
        let file = Filename.concat cwd f in
        { file; changes=(changes |> List.map parse_change) })
+end
+
+module Interactive = struct
+  let opts = [('y', `Write);('n', `Skip); ('a', `WriteAll); ('s', `SkipAll);
+     ('x', `Abort)]
+
+  let action key = opts |> List.assoc key
+
+  let string_of_action = function
+    | `Write    -> "write change"
+    | `Skip     -> "skip change"
+    | `WriteAll -> "write remaining"
+    | `SkipAll  -> "skip remaining"
+    | `Abort    -> "abort changes"
+
+  let dialog = 
+    let opt (key, act) = Printf.sprintf "(%c) %s" key (string_of_action act) in
+    let opts = opts |> List.map opt in
+    let dlg = List.fold_right (fun e msg -> e ^ "/" ^ msg) opts "" in
+    (fun () -> print_string dlg; (action (Console.get1char ())))
 end
 
 module Ungrouped : Read = struct
