@@ -111,7 +111,6 @@ module Misc = struct
     ) lines; close_out oc
 end
 
-
 type change_list =
   { file : string;
     changes : change list }
@@ -144,7 +143,6 @@ type conf =
 and action = Preview | Commit
 
 exception File_does_not_exist of string
-
 
 module Diffs = struct
   (* TODO : haven't implement color diff yet *)
