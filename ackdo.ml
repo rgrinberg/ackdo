@@ -170,7 +170,7 @@ end
 
 module Display = struct
   let display_diffs ~file ~diffs ~diff_out =
-    print_endline ("--> " ^ file);
+    print_endline ("--> " ^ ANSIColor.(apply [green] file));
     match diffs with
     | [] -> print_endline "[0 changes]";
     | _ -> diffs |> List.iter (fun { line; minus_line; plus_line } ->
