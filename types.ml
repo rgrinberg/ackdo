@@ -27,4 +27,4 @@ type conf =
     action : [`Preview | `Commit ];
     cwd : string; }
 
-
+exception File_does_not_exist of string

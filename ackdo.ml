@@ -48,27 +48,8 @@ module LCS = struct
     (lcs' (list_of_string xs) (list_of_string ys)) |> string_of_list
 end
 
-module Misc = struct
-  let read_lines_in chan = 
-    let rec loop l = 
-      try loop ((input_line chan) :: l)
-      with End_of_file -> close_in chan; List.rev l
-    in loop []
-
-  let read_lines path = 
-    let chan = open_in path in
-    read_lines_in chan
-
-  let write_lines path lines = 
-    let oc = open_out path in
-    List.iter (fun l -> 
-      Printf.fprintf oc "%s\n" l;
-    ) lines; close_out oc
-end
-
 (*contains all the necessary information needed to run the program*)
 
-exception File_does_not_exist of string
 
 module Diffs = struct
   (* TODO : haven't implement color diff yet *)
@@ -116,7 +97,7 @@ module Commit = struct
     then
       let previews = ref [] in
       let change_hash = prepare_changes changes in
-      let new_lines = file |> Misc.read_lines
+      let new_lines = file |> SimpleIO.read_lines
         |> List.mapi ( fun line_number_minus_one old_line -> 
             (*line_number_minus_one starts counting at 0 so we must
              * increment it*)
@@ -134,11 +115,11 @@ module Commit = struct
             ,List.rev !previews)
     else raise (File_does_not_exist file)
   let write_changes { path ; lines } =
-    Misc.write_lines path lines
+    SimpleIO.write_lines path lines
   let write_all_changes cg = cg |> List.iter write_changes
 end
 
-module StrMisc = struct
+module StrSimpleIO = struct
   let create_matcher re = 
     let r = Str.regexp re in
     ( fun x -> Str.string_match r x 0 )
@@ -162,8 +143,8 @@ module Grouped : Read = struct
         new_line=(matched_group 2 line) })
 
   let parse_changes ~lines ~cwd = lines
-    |> List.filter (not -| StrMisc.blank_str) 
-    |> split_f (not -| StrMisc.grouped_match)
+    |> List.filter (not -| StrSimpleIO.blank_str) 
+    |> split_f (not -| StrSimpleIO.grouped_match)
     |> List.map ( fun (f, changes) ->
        let file = Filename.concat cwd f in
        { file; changes=(changes |> List.map parse_change) })
@@ -207,7 +188,7 @@ module Ungrouped : Read = struct
         new_line=(matched_group 3 line) }) )
 
   let parse_changes ~lines ~cwd = lines
-    |> List.filter (not -| StrMisc.blank_str)
+    |> List.filter (not -| StrSimpleIO.blank_str)
     |> List.map parse_change
     |> List.group_by (fun (a,_) (b,_) -> a = b)
     |> List.map (fun e ->
@@ -229,14 +210,14 @@ module InputDetector = struct
   exception Failed_to_detect of string
   
   let line_marker line =
-    let open StrMisc in
+    let open StrSimpleIO in
     if ungrouped_detect line then Full
     else if grouped_match line then Line
     else if grouped_filepath line then File
     else Unknown
 
   let detect_input input =
-    let e = input |> List.filter (not -| StrMisc.blank_str)
+    let e = input |> List.filter (not -| StrSimpleIO.blank_str)
                   |> List.take 10 |> List.map line_marker in
     if e |> List.for_all ( fun x -> x = Full ) 
     then (module Ungrouped : Read)
@@ -296,7 +277,7 @@ module CmdArgs = struct
         if not (Sys.file_exists s) then
           raise (Arg.Bad ("File doesn't exist:" ^ s))
         else begin
-          input := (Misc.read_lines s);
+          input := (SimpleIO.read_lines s);
           input_file :=  Some(s);
         end
         ), ": -f read input from some file instead of stdin");
@@ -316,7 +297,7 @@ module CmdArgs = struct
      *path in the case when user specified an input file but did not set
      *an explicit cwd
      *)
-    input := (stdin |> Misc.read_lines_in );
+    input := (stdin |> SimpleIO.read_lines_in );
     (match (!input_file) with
     | Some f when (not (!forced_cwd)) -> cwd := Filename.dirname f
     | Some _ | None -> ());
