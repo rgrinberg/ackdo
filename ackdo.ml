@@ -7,15 +7,6 @@ module String = StringExt
 open Types
 
 (*let () = Printexc.record_backtrace true*)
-module Console = struct
-  (*ripped off from stackoverflow*)
-  let get1char () =
-    let termio = Unix.tcgetattr Unix.stdin in
-    let () = Unix.tcsetattr Unix.stdin Unix.TCSADRAIN 
-    { termio with Unix.c_icanon = false } in
-    let res = input_char stdin in
-    let () = Unix.tcsetattr Unix.stdin Unix.TCSADRAIN termio in res
-end
 
 module LCS = struct 
   (*inefficient crap. rewrite later*)
