@@ -118,7 +118,7 @@ module Commit = struct
   let write_all_changes cg = cg |> List.iter write_changes
 end
 
-module StrSimpleIO = struct
+module StrMisc = struct
   let create_matcher re = 
     let r = Str.regexp re in
     ( fun x -> Str.string_match r x 0 )
@@ -142,8 +142,8 @@ module Grouped : Read = struct
         new_line=(matched_group 2 line) })
 
   let parse_changes ~lines ~cwd = lines
-    |> List.filter (not -| StrSimpleIO.blank_str) 
-    |> split_f (not -| StrSimpleIO.grouped_match)
+    |> List.filter (not -| StrMisc.blank_str) 
+    |> split_f (not -| StrMisc.grouped_match)
     |> List.map ( fun (f, changes) ->
        let file = Filename.concat cwd f in
        { file; changes=(changes |> List.map parse_change) })
@@ -167,7 +167,7 @@ module Ungrouped : Read = struct
         new_line=(matched_group 3 line) }) )
 
   let parse_changes ~lines ~cwd = lines
-    |> List.filter (not -| StrSimpleIO.blank_str)
+    |> List.filter (not -| StrMisc.blank_str)
     |> List.map parse_change
     |> List.group_by (fun (a,_) (b,_) -> a = b)
     |> List.map (fun e ->
@@ -189,14 +189,14 @@ module InputDetector = struct
   exception Failed_to_detect of string
   
   let line_marker line =
-    let open StrSimpleIO in
+    let open StrMisc in
     if ungrouped_detect line then Full
     else if grouped_match line then Line
     else if grouped_filepath line then File
     else Unknown
 
   let detect_input input =
-    let e = input |> List.filter (not -| StrSimpleIO.blank_str)
+    let e = input |> List.filter (not -| StrMisc.blank_str)
                   |> List.take 10 |> List.map line_marker in
     if e |> List.for_all ( fun x -> x = Full ) 
     then (module Ungrouped : Read)
