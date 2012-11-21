@@ -1,56 +1,10 @@
 let (|>) g f = f g
 let (-|) g f = fun x -> x |> f |> g 
 
+module List   = ListExt
+module String = StringExt
+
 (*let () = Printexc.record_backtrace true*)
-module List = struct
-  (*
-   *we would like a slim list of dependencies, hence we have to reinvent a few
-   *wheels here
-   *)
-  include List
-
-  let map_by_two f l = 
-    let rec loop acc = function
-      | x::y::xs -> loop ((f x y)::acc) xs
-      | _::[] -> failwith "Odd number of elements"
-      | [] -> List.rev acc
-    in loop [] l
-
-  let take x l = 
-    let rec loop acc count l =
-      if count = 0 then List.rev acc
-      else match l with
-      | x::xs -> loop (x::acc) (pred count) xs
-      (*
-       *if there are not enough elements we return what we have instead
-       *of throwing an error
-       *)
-      | [] -> List.rev acc
-    in loop [] x l
-
-  (* compatibility for 3.12 *)
-  let mapi f a = 
-    let rec loop acc i = function
-      | [] -> List.rev acc
-      | x::xs -> loop ((f i x)::acc) (succ i) xs
-    in loop [] 0 a
-
-  let group_by f l = 
-    let rec loop acc current_acc last = function
-      | (x::xs) as l ->
-          begin match last with
-          | Some (last_e) -> 
-              if (f x last_e)
-              then loop acc (x::current_acc) (Some x) xs
-              else loop ((List.rev current_acc)::acc) [] None l
-          | None -> loop acc [x] (Some x) xs
-          end
-      | [] -> List.rev ((List.rev current_acc)::acc)
-    in match l with 
-    | [] -> []
-    | xs -> loop [] [] None xs
-end
-
 module Console = struct
   (*ripped off from stackoverflow*)
   let get1char () =
@@ -60,17 +14,6 @@ module Console = struct
     let res = input_char stdin in
     let () = Unix.tcsetattr Unix.stdin Unix.TCSADRAIN termio in res
 end
-
-module String = struct
-  include String
-  let split s ~by = 
-    if by = "" then (s, "") else begin
-      let re = Str.regexp ("\(^.*\)" ^ (Str.quote by) ^ "\(.*\)$") in
-      let smatch = Str.string_match re s 0 in
-      if not smatch then raise Not_found
-      else Str.(matched_group 1 s, matched_group 1 s)
-    end
-end                             
 
 module LCS = struct 
   (*inefficient crap. rewrite later*)
@@ -131,10 +74,7 @@ and change =
 type commit = 
   { path : string;
     lines : string list; }
-(*
- *we must stick this module declaration here for now until I learn how
- *to define types and module signatures recursively
- *)
+
 module type Read = sig
   val parse_changes : lines:string list -> cwd:string -> change_list list
 end
