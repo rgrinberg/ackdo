@@ -50,7 +50,6 @@ end
 
 (*contains all the necessary information needed to run the program*)
 
-
 module Diffs = struct
   (* TODO : haven't implement color diff yet *)
   let color_line x lcs y = 
@@ -148,26 +147,6 @@ module Grouped : Read = struct
     |> List.map ( fun (f, changes) ->
        let file = Filename.concat cwd f in
        { file; changes=(changes |> List.map parse_change) })
-end
-
-module Interactive = struct
-  let opts = [('y', `Write);('n', `Skip); ('a', `WriteAll); ('s', `SkipAll);
-     ('x', `Abort)]
-
-  let action key = opts |> List.assoc key
-
-  let string_of_action = function
-    | `Write    -> "write change"
-    | `Skip     -> "skip change"
-    | `WriteAll -> "write remaining"
-    | `SkipAll  -> "skip remaining"
-    | `Abort    -> "abort changes"
-
-  let dialog = 
-    let opt (key, act) = Printf.sprintf "(%c) %s" key (string_of_action act) in
-    let opts = opts |> List.map opt in
-    let dlg = List.fold_right (fun e msg -> e ^ "/" ^ msg) opts "" in
-    (fun () -> print_string dlg; (action (Console.get1char ())))
 end
 
 module Ungrouped : Read = struct
