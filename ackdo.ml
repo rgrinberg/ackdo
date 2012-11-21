@@ -8,37 +8,6 @@ open Types
 
 (*let () = Printexc.record_backtrace true*)
 
-module LCS = struct 
-  (*inefficient crap. rewrite later*)
-  let longest xs ys = if List.length xs > List.length ys then xs else ys
-
-  let list_of_string str =
-    let result = ref [] in
-    String.iter (fun x -> result := x :: !result)
-    str; List.rev !result
- 
-  let string_of_list lst =
-    let result = String.create (List.length lst) in
-    ignore (List.fold_left (fun i x -> result.[i] <- x; i+1) 0 lst);
-    result
-
-  let lcs' xs' ys' =
-    let (xs, ys) = Array.(of_list xs', of_list ys') in
-    let (n, m) = Array.(length xs, length ys) in
-    let a = Array.make_matrix (n+1) (m+1) [] in
-    for i = n-1 downto 0 do
-      for j = m-1 downto 0 do
-        a.(i).(j) <- if xs.(i) = ys.(j) then xs.(i) :: a.(i+1).(j+1)
-                     else longest a.(i).(j+1) a.(i+1).(j)
-      done
-    done;
-    a.(0).(0)
-
-  (*NOTE: this lcs is actually lowest common subsequence not string. fix later*)
-  let lcs xs ys = 
-    (lcs' (list_of_string xs) (list_of_string ys)) |> string_of_list
-end
-
 (*contains all the necessary information needed to run the program*)
 
 module Display = struct
