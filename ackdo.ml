@@ -118,16 +118,6 @@ module Commit = struct
   let write_all_changes cg = cg |> List.iter write_changes
 end
 
-module StrMisc = struct
-  let create_matcher re = 
-    let r = Str.regexp re in
-    ( fun x -> Str.string_match r x 0 )
-  let blank_str = create_matcher "^ *$"
-  let grouped_match = create_matcher "^[1-9][0-9]*:.+$" 
-  let ungrouped_detect = create_matcher "^.+:[0-9]+:.+$" 
-  let grouped_filepath = create_matcher "^.+$"
-end
-
 module Grouped : Read = struct 
   let split_f f l =
     let unmerged = l |> List.group_by (fun a b -> (f a) = (f b))
