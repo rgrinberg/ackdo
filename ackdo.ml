@@ -45,6 +45,7 @@ module Diffs = struct
   (* TODO : haven't implement color diff yet *)
   let color_line x lcs y = 
     let open ANSIColor in x ^ (apply [red] lcs) ^ y
+
   let color ~minus_line ~plus_line = 
     let lcs = LCS.lcs minus_line plus_line in
     let (m1, m2) = String.split minus_line ~by:lcs in
@@ -53,6 +54,14 @@ module Diffs = struct
 
   let black_white ~minus_line ~plus_line =
     "- " ^ minus_line ^ "\n+ " ^ plus_line
+
+  let custom_diff ~format = 
+    let (re_m, re_p) = Str.(regexp "%\-", regexp "%\+") in
+    begin fun ~minus_line ~plus_line ->
+      let tmp = Str.global_replace re_m minus_line format in
+      let tmp = Str.global_replace re_p plus_line tmp in
+      tmp
+    end
 end
 
 module Display = struct
@@ -247,6 +256,9 @@ module CmdArgs = struct
 
       ("-r", Arg.Unit ( fun () -> printer := Diffs.color ),
         ": turn on color output" );
+
+      ("-s", Arg.String (fun format -> printer := Diffs.custom_diff ~format), 
+        ": set custom formatter" );
      ] in
     Arg.parse 
       speclist 
