@@ -4,6 +4,8 @@ let (-|) g f = fun x -> x |> f |> g
 module List   = ListExt
 module String = StringExt
 
+open Types
+
 (*let () = Printexc.record_backtrace true*)
 module Console = struct
   (*ripped off from stackoverflow*)
@@ -64,33 +66,7 @@ module Misc = struct
     ) lines; close_out oc
 end
 
-type change_list =
-  { file : string;
-    changes : change list }
-and change =
-  { change_line : int;
-    new_line : string; }
-(*change_list is converted to commit*)
-type commit = 
-  { path : string;
-    lines : string list; }
-
-module type Read = sig
-  val parse_changes : lines:string list -> cwd:string -> change_list list
-end
-type preview =
-  { line : int;
-    minus_line : string;
-    plus_line : string; }
-
 (*contains all the necessary information needed to run the program*)
-type conf = 
-  { input : string list;
-    input_parser : (module Read);
-    diff_out : minus_line:string -> plus_line:string -> string;
-    action : action;
-    cwd : string; }
-and action = Preview | Commit
 
 exception File_does_not_exist of string
 
@@ -290,9 +266,9 @@ module Operations = struct
       |> List.map ( fun { file; _ } -> file ) |> verify_paths;
       let changes = change_lists |> List.map Commit.file_of_changes in
       match action with
-      | Preview -> changes |> List.iter ( fun ({path=file;_}, preview_list) ->
+      | `Preview -> changes |> List.iter ( fun ({path=file;_}, preview_list) ->
           Display.display_diffs ~file ~diffs:preview_list ~diff_out );
-      | Commit -> 
+      | `Commit -> 
         (*extract all the files that actually have changes and write those*)
         changes 
         |> List.filter ( fun (_,preview_l) -> (List.length preview_l) > 0 )
@@ -307,13 +283,13 @@ module CmdArgs = struct
   let usage = "usage: " ^ Sys.argv.(0) ^ " [-d] [-f file] [-c directory] [-r]"
   let read_args () = 
     let input_file = ref None in
-    let action     = ref Preview in
+    let action     = ref `Preview in
     let input      = ref [] in
     let cwd        = ref (Unix.getcwd ()) in
     let forced_cwd = ref false in
     let printer    = ref Diffs.black_white in
     let speclist = [
-      ("-d", Arg.Unit ( fun () -> action := Commit ), ": -d to commit. nothing
+      ("-d", Arg.Unit ( fun () -> action := `Commit ), ": -d to commit. nothing
       to preview" );
 
       ("-f", Arg.String ( fun s -> 
