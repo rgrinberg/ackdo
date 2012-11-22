@@ -16,8 +16,8 @@ module Display = struct
     match diffs with
     | [] -> print_endline "[0 changes]";
     | _ -> diffs |> List.iter (fun { line; minus_line; plus_line } ->
-        print_endline ((string_of_int line) ^ ":");
-        print_endline (diff_out ~minus_line ~plus_line))
+        (*let line = int_of_string line in*)
+        print_endline (diff_out ~line ~minus_line ~plus_line))
 end
 
 module Commit = struct 

@@ -20,10 +20,14 @@ type preview =
     minus_line : string;
     plus_line : string; }
 
+(*
+ *everything that is needed to run the program should be contained in this
+ *type
+ *)
 type conf = 
   { input : string list;
     input_parser : (module Read);
-    diff_out : minus_line:string -> plus_line:string -> string;
+    diff_out : line:int -> minus_line:string -> plus_line:string -> string;
     action : [`Preview | `Commit ];
     cwd : string; }
 
