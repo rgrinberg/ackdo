@@ -1,6 +1,7 @@
 open Common
 open Types
 
+(*this module is not really necessary*)
 module type Read = sig val parse_changes : parse_changes end
 
 module Grouped : Read = struct 
