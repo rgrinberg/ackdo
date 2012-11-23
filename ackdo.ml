@@ -115,6 +115,8 @@ module Operations = struct
         |> List.map fst |> Commit.write_all_changes
     with Bad_paths(p) -> begin
       print_endline "looks like you supplied bad paths. perhaps cwd is wrong?";
+      print_endline "Another possible cause for this error is that your input
+contains some strange characters that make the path parser fail";
       p |> List.iter ( fun path -> Printf.printf "'%s' does not exist\n" path )
     end
 end
