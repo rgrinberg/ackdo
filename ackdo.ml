@@ -3,18 +3,6 @@ open Types
 
 (*let () = Printexc.record_backtrace true*)
 
-(*contains all the necessary information needed to run the program*)
-
-module Display = struct
-  let display_diffs ~file ~diffs ~diff_out =
-    print_endline ("--> " ^ ANSIColor.(apply [green] file));
-    match diffs with
-    | [] -> print_endline "[0 changes]";
-    | _ -> diffs |> List.iter (fun { line; minus_line; plus_line } ->
-        (*let line = int_of_string line in*)
-        print_endline (diff_out ~line ~minus_line ~plus_line))
-end
-
 module Commit = struct 
   (*
    *converts a 'change list' into a Hashtbl that makes it easy to access
