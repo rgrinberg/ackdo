@@ -7,9 +7,7 @@ and change =
 
 (*change_list is converted to commit*)
 (*must stick thise module signature because of the conf type*)
-module type Read = sig
-  val parse_changes : lines:string list -> cwd:string -> change_list list
-end
+type parse_changes = lines:string list -> cwd:string -> change_list list
 
 type commit = 
   { path : string;
@@ -26,7 +24,7 @@ type preview =
  *)
 type conf = 
   { input : string list;
-    input_parser : (module Read);
+    input_parser : parse_changes;
     diff_out : line:int -> minus_line:string -> plus_line:string -> string;
     action : [`Preview | `Commit ];
     cwd : string; }

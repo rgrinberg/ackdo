@@ -1,9 +1,4 @@
-let (|>) g f = f g
-let (-|) g f = fun x -> x |> f |> g 
-
-module List   = ListExt
-module String = StringExt
-
+open Common
 open Types
 
 (*let () = Printexc.record_backtrace true*)
@@ -64,55 +59,6 @@ module Commit = struct
   let write_all_changes cg = cg |> List.iter write_changes
 end
 
-module Grouped : Read = struct 
-  let split_f f l =
-    let unmerged = l |> List.group_by (fun a b -> (f a) = (f b))
-    in unmerged |> List.map_by_two (fun x y -> (List.hd x, y))
-
-  let parse_change = 
-    let re = Str.regexp "^\([0-9]+\):\(.+\)$" in
-    (fun line ->
-      (Str.string_match re line 0) |> ignore;
-      let open Str in
-      { change_line=((matched_group 1 line) |> int_of_string );
-        new_line=(matched_group 2 line) })
-
-  let parse_changes ~lines ~cwd = lines
-    |> List.filter (not -| StrMisc.blank_str) 
-    |> split_f (not -| StrMisc.grouped_match)
-    |> List.map ( fun (f, changes) ->
-       let file = Filename.concat cwd f in
-       { file; changes=(changes |> List.map parse_change) })
-end
-
-module Ungrouped : Read = struct
-  (*
-   *We assume that all of the following characters cannot occur in the filepath.
-   *This is of course a false assumption for Unix but it makes the change matcher
-   *a lot more robust in practice. It also works well enough for real world
-   *applications
-   *)
-  let disallowed_chars = Str.quote "()\"'"
-  let parse_change =
-    let re = Str.regexp ("^\([^"^ disallowed_chars ^"]+\):\([0-9]+\):\(.+\)$") in
-    (fun line ->
-      (Str.string_match re line 0) |> ignore;
-      let open Str in
-      ( matched_group 1 line,
-      { change_line=((matched_group 2 line) |> int_of_string );
-        new_line=(matched_group 3 line) }) )
-
-  let parse_changes ~lines ~cwd = lines
-    |> List.filter (not -| StrMisc.blank_str)
-    |> List.map parse_change
-    |> List.group_by (fun (a,_) (b,_) -> a = b)
-    |> List.map (fun e ->
-        let file = Filename.concat cwd
-          (match e with 
-          | (f,_)::_ -> f
-          | [] -> failwith "wtf this is bullshit")
-        in { file; changes=(e |> List.map snd) })
-end
 
 module InputDetector = struct
   type input_match = Full | File | Line | Unknown
@@ -135,9 +81,9 @@ module InputDetector = struct
     let e = input |> List.filter (not -| StrMisc.blank_str)
                   |> List.take 10 |> List.map line_marker in
     if e |> List.for_all ( fun x -> x = Full ) 
-    then (module Ungrouped : Read)
+    then ChangeParsers.Ungrouped.parse_changes
     else match e with
-      | File::Line::_ -> (module Grouped : Read)
+      | File::Line::_ -> ChangeParsers.Grouped.parse_changes
       | [] -> raise (Failed_to_detect "Received empty list, what gives?")
       | _ -> raise (Failed_to_detect "Bad input")
 end
@@ -154,9 +100,7 @@ module Operations = struct
     | [] -> () | xs -> raise (Bad_paths xs)
 
   let run_program { input=lines ; input_parser ; action ; cwd ; diff_out } = 
-    let change_lists = 
-      let module IP = (val input_parser : Read) in
-      (IP.parse_changes ~lines ~cwd) in
+    let change_lists = input_parser ~lines ~cwd in
     try
       change_lists
       |> List.map ( fun { file; _ } -> file ) |> verify_paths;
@@ -220,7 +164,7 @@ module CmdArgs = struct
     | Some f when (not (!forced_cwd)) -> cwd := Filename.dirname f
     | Some _ | None -> ());
     let open InputDetector in
-    let module IP = (val (detect_input !input) : Read) in
-    { action=(!action) ; input_parser=(module IP : Read); input=(!input) ;
+    let change_parser = detect_input !input in
+    { action=(!action) ; input_parser=change_parser; input=(!input) ;
       cwd=(!cwd) ; diff_out=(!printer) }
 end
