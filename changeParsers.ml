@@ -5,6 +5,7 @@ open Types
 module type Read = sig val parse_changes : parse_changes end
 
 module Grouped : Read = struct 
+  (* TODO : remove this module. it's never used *)
   let split_f f l =
     let unmerged = l |> List.group_by (fun a b -> (f a) = (f b))
     in unmerged |> List.map_by_two (fun x y -> (List.hd x, y))
